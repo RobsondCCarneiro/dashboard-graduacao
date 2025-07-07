@@ -623,6 +623,155 @@ tab_ingressantes_viz, tab_egressos_viz, tab_comparacao_viz = st.tabs([
 with tab_ingressantes_viz:
     st.header("Análise Detalhada de Alunos Ingressantes")
 
+    # --- NOVO GRÁFICO 1: Rosca Aninhada - Unidade > Nível de Ensino > Curso ---
+    st.subheader("Distribuição Hierárquica de Ingressantes: Unidade > Nível de Ensino > Curso")
+
+    required_cols_unidade_nivel_curso = ['nome_unidade', 'nivel_ensino', 'nome_curso']
+    if all(col in filtered_ingressantes.columns for col in required_cols_unidade_nivel_curso) and not filtered_ingressantes.empty:
+        # Criar dados para o Sunburst Chart
+        df_unidade_nivel_curso = filtered_ingressantes.groupby(required_cols_unidade_nivel_curso).size().reset_index(name='count')
+
+        # Para o Sunburst, precisamos de IDs únicos e pais
+        # Cada nó terá um ID (Unidade, Unidade_Nivel, Unidade_Nivel_Curso)
+        # O pai de Unidade_Nivel é Unidade, o pai de Unidade_Nivel_Curso é Unidade_Nivel
+
+        # Nível 1: Unidade
+        unidades = df_unidade_nivel_curso.groupby('nome_unidade')['count'].sum().reset_index()
+        unidades['ids'] = unidades['nome_unidade']
+        unidades['parents'] = ""
+        unidades['labels'] = unidades['nome_unidade']
+
+        # Nível 2: Nível de Ensino dentro de Unidade
+        unidade_nivel = df_unidade_nivel_curso.groupby(['nome_unidade', 'nivel_ensino'])['count'].sum().reset_index()
+        unidade_nivel['ids'] = unidade_nivel['nome_unidade'] + " - " + unidade_nivel['nivel_ensino']
+        unidade_nivel['parents'] = unidade_nivel['nome_unidade']
+        unidade_nivel['labels'] = unidade_nivel['nivel_ensino']
+
+        # Nível 3: Curso dentro de Nível de Ensino (dentro de Unidade)
+        cursos_completos = df_unidade_nivel_curso.copy()
+        cursos_completos['ids'] = cursos_completos['nome_unidade'] + " - " + cursos_completos['nivel_ensino'] + " - " + cursos_completos['nome_curso']
+        cursos_completos['parents'] = cursos_completos['nome_unidade'] + " - " + cursos_completos['nivel_ensino']
+        cursos_completos['labels'] = cursos_completos['nome_curso']
+
+        # Concatena todos os níveis para o Sunburst
+        sunburst_data_unidade = pd.concat([
+            unidades[['ids', 'parents', 'labels', 'count']],
+            unidade_nivel[['ids', 'parents', 'labels', 'count']],
+            cursos_completos[['ids', 'parents', 'labels', 'count']]
+        ])
+
+        fig_sunburst_unidade = go.Figure(go.Sunburst(
+            ids=sunburst_data_unidade['ids'],
+            labels=sunburst_data_unidade['labels'],
+            parents=sunburst_data_unidade['parents'],
+            values=sunburst_data_unidade['count'],
+            branchvalues="total",
+            hovertemplate='<b>%{label}</b><br>Alunos: %{value}<br>Percentual: %{percentParent}<extra></extra>'
+        ))
+        fig_sunburst_unidade.update_layout(margin = dict(t=0, l=0, r=0, b=0),
+                                            title_text='Ingressantes por Unidade, Nível de Ensino e Curso')
+        st.plotly_chart(fig_sunburst_unidade, use_container_width=True)
+    else:
+        st.info("Colunas 'nome_unidade', 'nivel_ensino' ou 'nome_curso' não disponíveis nos dados filtrados de ingressantes para este gráfico, ou DataFrame vazio.")
+
+    st.markdown("---") # Separador para o próximo gráfico
+
+    # --- NOVO GRÁFICO 2: Rosca Aninhada - Sexo > Nível de Ensino > Curso ---
+    st.subheader("Distribuição Hierárquica de Ingressantes: Sexo > Nível de Ensino > Curso")
+
+    required_cols_sexo_nivel_curso = ['sexo', 'nivel_ensino', 'nome_curso']
+    if all(col in filtered_ingressantes.columns for col in required_cols_sexo_nivel_curso) and not filtered_ingressantes.empty:
+        # Criar dados para o Sunburst Chart
+        df_sexo_nivel_curso = filtered_ingressantes.groupby(required_cols_sexo_nivel_curso).size().reset_index(name='count')
+
+        # Nível 1: Sexo
+        sexos = df_sexo_nivel_curso.groupby('sexo')['count'].sum().reset_index()
+        sexos['ids'] = sexos['sexo']
+        sexos['parents'] = ""
+        sexos['labels'] = sexos['sexo']
+
+        # Nível 2: Nível de Ensino dentro de Sexo
+        sexo_nivel = df_sexo_nivel_curso.groupby(['sexo', 'nivel_ensino'])['count'].sum().reset_index()
+        sexo_nivel['ids'] = sexo_nivel['sexo'] + " - " + sexo_nivel['nivel_ensino']
+        sexo_nivel['parents'] = sexo_nivel['sexo']
+        sexo_nivel['labels'] = sexo_nivel['nivel_ensino']
+
+        # Nível 3: Curso dentro de Nível de Ensino (dentro de Sexo)
+        cursos_completos_sexo = df_sexo_nivel_curso.copy()
+        cursos_completos_sexo['ids'] = cursos_completos_sexo['sexo'] + " - " + cursos_completos_sexo['nivel_ensino'] + " - " + cursos_completos_sexo['nome_curso']
+        cursos_completos_sexo['parents'] = cursos_completos_sexo['sexo'] + " - " + cursos_completos_sexo['nivel_ensino']
+        cursos_completos_sexo['labels'] = cursos_completos_sexo['nome_curso']
+
+        # Concatena todos os níveis para o Sunburst
+        sunburst_data_sexo = pd.concat([
+            sexos[['ids', 'parents', 'labels', 'count']],
+            sexo_nivel[['ids', 'parents', 'labels', 'count']],
+            cursos_completos_sexo[['ids', 'parents', 'labels', 'count']]
+        ])
+
+        fig_sunburst_sexo = go.Figure(go.Sunburst(
+            ids=sunburst_data_sexo['ids'],
+            labels=sunburst_data_sexo['labels'],
+            parents=sunburst_data_sexo['parents'],
+            values=sunburst_data_sexo['count'],
+            branchvalues="total",
+            hovertemplate='<b>%{label}</b><br>Alunos: %{value}<br>Percentual: %{percentParent}<extra></extra>'
+        ))
+        fig_sunburst_sexo.update_layout(margin = dict(t=0, l=0, r=0, b=0),
+                                         title_text='Ingressantes por Sexo, Nível de Ensino e Curso')
+        st.plotly_chart(fig_sunburst_sexo, use_container_width=True)
+    else:
+        st.info("Colunas 'sexo', 'nivel_ensino' ou 'nome_curso' não disponíveis nos dados filtrados de ingressantes para este gráfico, ou DataFrame vazio.")
+
+
+    st.markdown("---") # Separador para o próximo gráfico
+
+    # --- GRÁFICO ANTERIOR: Rosca Aninhada - Nível de Ensino > Curso (primeira sugestão) ---
+    st.subheader("Distribuição Hierárquica: Nível de Ensino e Cursos (Ingressantes)")
+
+    if 'nivel_ensino' in filtered_ingressantes.columns and 'nome_curso' in filtered_ingressantes.columns and not filtered_ingressantes.empty:
+        df_grouped_hierarchy = filtered_ingressantes.groupby(['nivel_ensino', 'nome_curso']).size().reset_index(name='count')
+        
+        # Para o Sunburst Chart (Hierarquia de Nível de Ensino -> Curso)
+        # Nível 1: Nível de Ensino
+        niveis = df_grouped_hierarchy.groupby('nivel_ensino')['count'].sum().reset_index()
+        niveis['ids'] = niveis['nivel_ensino']
+        niveis['parents'] = ""
+        niveis['labels'] = niveis['nivel_ensino']
+
+        # Nível 2: Curso dentro de Nível de Ensino
+        cursos_no_nivel = df_grouped_hierarchy.copy()
+        cursos_no_nivel['ids'] = cursos_no_nivel['nivel_ensino'] + " - " + cursos_no_nivel['nome_curso']
+        cursos_no_nivel['parents'] = cursos_no_nivel['nivel_ensino']
+        cursos_no_nivel['labels'] = cursos_no_nivel['nome_curso']
+
+        sunburst_data_nivel = pd.concat([
+            niveis[['ids', 'parents', 'labels', 'count']],
+            cursos_no_nivel[['ids', 'parents', 'labels', 'count']]
+        ])
+
+        fig_donut_aninhado = go.Figure(go.Sunburst(
+            ids=sunburst_data_nivel['ids'],
+            labels=sunburst_data_nivel['labels'],
+            parents=sunburst_data_nivel['parents'],
+            values=sunburst_data_nivel['count'],
+            branchvalues="total", 
+            hovertemplate='<b>%{label}</b><br>Alunos: %{value}<br>Percentual: %{percentParent}<extra></extra>'
+        ))
+        fig_donut_aninhado.update_layout(
+            margin = dict(t=0, l=0, r=0, b=0),
+            title_text='Ingressantes por Nível de Ensino e Cursos'
+        )
+
+        st.plotly_chart(fig_donut_aninhado, use_container_width=True)
+
+    else:
+        st.info("Colunas 'nivel_ensino' ou 'nome_curso' não disponíveis nos dados filtrados de ingressantes para o gráfico de rosca aninhado, ou DataFrame vazio.")
+
+
+    st.markdown("---") # Separador para os próximos gráficos
+
+
     if not filtered_ingressantes.empty:
         with st.container():
             col_ing1, col_ing2 = st.columns(2)
@@ -653,7 +802,24 @@ with tab_ingressantes_viz:
                     st.info("Coluna 'sexo' não disponível nos dados de ingressantes para este gráfico.")
         
         st.subheader("Tabela de Dados Filtrados (Ingressantes)")
-        st.dataframe(filtered_ingressantes.head(10))
+        
+        # Adiciona o slider para controlar a quantidade de alunos
+        max_rows_ingressantes = len(filtered_ingressantes)
+        num_alunos_ingressantes = st.slider(
+            "Número de alunos a exibir (Ingressantes):",
+            min_value=1,
+            max_value=max_rows_ingressantes if max_rows_ingressantes > 0 else 1,
+            value=min(10, max_rows_ingressantes) if max_rows_ingressantes > 0 else 1,
+            step=1,
+            key='num_alunos_ingressantes_slider'
+        )
+
+        # Cria uma cópia para remover a coluna sem afetar o DataFrame original
+        df_display_ingressantes = filtered_ingressantes.copy()
+        if 'nome_discente' in df_display_ingressantes.columns:
+            df_display_ingressantes = df_display_ingressantes.drop(columns=['nome_discente'])
+
+        st.dataframe(df_display_ingressantes.head(num_alunos_ingressantes))
         st.write(f"Total de registros de Ingressantes filtrados: {len(filtered_ingressantes)}")
 
     else:
@@ -662,6 +828,148 @@ with tab_ingressantes_viz:
 # --- TAB 2: Análise de Egressos ---
 with tab_egressos_viz:
     st.header("Análise Detalhada de Alunos Egressos")
+
+    # --- NOVO GRÁFICO 1: Rosca Aninhada - Unidade > Nível de Ensino > Curso (EGRESSOS) ---
+    st.subheader("Distribuição Hierárquica de Egressos: Unidade > Nível de Ensino > Curso")
+
+    required_cols_unidade_nivel_curso_egressos = ['nome_unidade', 'nivel_ensino', 'nome_curso']
+    if all(col in filtered_egressos.columns for col in required_cols_unidade_nivel_curso_egressos) and not filtered_egressos.empty:
+        df_unidade_nivel_curso_egressos = filtered_egressos.groupby(required_cols_unidade_nivel_curso_egressos).size().reset_index(name='count')
+
+        # Nível 1: Unidade
+        unidades_egressos = df_unidade_nivel_curso_egressos.groupby('nome_unidade')['count'].sum().reset_index()
+        unidades_egressos['ids'] = unidades_egressos['nome_unidade']
+        unidades_egressos['parents'] = ""
+        unidades_egressos['labels'] = unidades_egressos['nome_unidade']
+
+        # Nível 2: Nível de Ensino dentro de Unidade
+        unidade_nivel_egressos = df_unidade_nivel_curso_egressos.groupby(['nome_unidade', 'nivel_ensino'])['count'].sum().reset_index()
+        unidade_nivel_egressos['ids'] = unidade_nivel_egressos['nome_unidade'] + " - " + unidade_nivel_egressos['nivel_ensino']
+        unidade_nivel_egressos['parents'] = unidade_nivel_egressos['nome_unidade']
+        unidade_nivel_egressos['labels'] = unidade_nivel_egressos['nivel_ensino']
+
+        # Nível 3: Curso dentro de Nível de Ensino (dentro de Unidade)
+        cursos_completos_egressos = df_unidade_nivel_curso_egressos.copy()
+        cursos_completos_egressos['ids'] = cursos_completos_egressos['nome_unidade'] + " - " + cursos_completos_egressos['nivel_ensino'] + " - " + cursos_completos_egressos['nome_curso']
+        cursos_completos_egressos['parents'] = cursos_completos_egressos['nome_unidade'] + " - " + cursos_completos_egressos['nivel_ensino']
+        cursos_completos_egressos['labels'] = cursos_completos_egressos['nome_curso']
+
+        # Concatena todos os níveis para o Sunburst
+        sunburst_data_unidade_egressos = pd.concat([
+            unidades_egressos[['ids', 'parents', 'labels', 'count']],
+            unidade_nivel_egressos[['ids', 'parents', 'labels', 'count']],
+            cursos_completos_egressos[['ids', 'parents', 'labels', 'count']]
+        ])
+
+        fig_sunburst_unidade_egressos = go.Figure(go.Sunburst(
+            ids=sunburst_data_unidade_egressos['ids'],
+            labels=sunburst_data_unidade_egressos['labels'],
+            parents=sunburst_data_unidade_egressos['parents'],
+            values=sunburst_data_unidade_egressos['count'],
+            branchvalues="total",
+            hovertemplate='<b>%{label}</b><br>Alunos: %{value}<br>Percentual: %{percentParent}<extra></extra>'
+        ))
+        fig_sunburst_unidade_egressos.update_layout(margin = dict(t=0, l=0, r=0, b=0),
+                                                    title_text='Egressos por Unidade, Nível de Ensino e Curso')
+        st.plotly_chart(fig_sunburst_unidade_egressos, use_container_width=True)
+    else:
+        st.info("Colunas 'nome_unidade', 'nivel_ensino' ou 'nome_curso' não disponíveis nos dados filtrados de egressos para este gráfico, ou DataFrame vazio.")
+
+    st.markdown("---") # Separador
+
+    # --- NOVO GRÁFICO 2: Rosca Aninhada - Sexo > Nível de Ensino > Curso (EGRESSOS) ---
+    st.subheader("Distribuição Hierárquica de Egressos: Sexo > Nível de Ensino > Curso")
+
+    required_cols_sexo_nivel_curso_egressos = ['sexo', 'nivel_ensino', 'nome_curso']
+    if all(col in filtered_egressos.columns for col in required_cols_sexo_nivel_curso_egressos) and not filtered_egressos.empty:
+        df_sexo_nivel_curso_egressos = filtered_egressos.groupby(required_cols_sexo_nivel_curso_egressos).size().reset_index(name='count')
+
+        # Nível 1: Sexo
+        sexos_egressos = df_sexo_nivel_curso_egressos.groupby('sexo')['count'].sum().reset_index()
+        sexos_egressos['ids'] = sexos_egressos['sexo']
+        sexos_egressos['parents'] = ""
+        sexos_egressos['labels'] = sexos_egressos['sexo']
+
+        # Nível 2: Nível de Ensino dentro de Sexo
+        sexo_nivel_egressos = df_sexo_nivel_curso_egressos.groupby(['sexo', 'nivel_ensino'])['count'].sum().reset_index()
+        sexo_nivel_egressos['ids'] = sexo_nivel_egressos['sexo'] + " - " + sexo_nivel_egressos['nivel_ensino']
+        sexo_nivel_egressos['parents'] = sexo_nivel_egressos['sexo']
+        sexo_nivel_egressos['labels'] = sexo_nivel_egressos['nivel_ensino']
+
+        # Nível 3: Curso dentro de Nível de Ensino (dentro de Sexo)
+        cursos_completos_sexo_egressos = df_sexo_nivel_curso_egressos.copy()
+        cursos_completos_sexo_egressos['ids'] = cursos_completos_sexo_egressos['sexo'] + " - " + cursos_completos_sexo_egressos['nivel_ensino'] + " - " + cursos_completos_sexo_egressos['nome_curso']
+        cursos_completos_sexo_egressos['parents'] = cursos_completos_sexo_egressos['sexo'] + " - " + cursos_completos_sexo_egressos['nivel_ensino']
+        cursos_completos_sexo_egressos['labels'] = cursos_completos_sexo_egressos['nome_curso']
+
+        # Concatena todos os níveis para o Sunburst
+        sunburst_data_sexo_egressos = pd.concat([
+            sexos_egressos[['ids', 'parents', 'labels', 'count']],
+            sexo_nivel_egressos[['ids', 'parents', 'labels', 'count']],
+            cursos_completos_sexo_egressos[['ids', 'parents', 'labels', 'count']]
+        ])
+
+        fig_sunburst_sexo_egressos = go.Figure(go.Sunburst(
+            ids=sunburst_data_sexo_egressos['ids'],
+            labels=sunburst_data_sexo_egressos['labels'],
+            parents=sunburst_data_sexo_egressos['parents'],
+            values=sunburst_data_sexo_egressos['count'],
+            branchvalues="total",
+            hovertemplate='<b>%{label}</b><br>Alunos: %{value}<br>Percentual: %{percentParent}<extra></extra>'
+        ))
+        fig_sunburst_sexo_egressos.update_layout(margin = dict(t=0, l=0, r=0, b=0),
+                                                 title_text='Egressos por Sexo, Nível de Ensino e Curso')
+        st.plotly_chart(fig_sunburst_sexo_egressos, use_container_width=True)
+    else:
+        st.info("Colunas 'sexo', 'nivel_ensino' ou 'nome_curso' não disponíveis nos dados filtrados de egressos para este gráfico, ou DataFrame vazio.")
+
+    st.markdown("---") # Separador
+
+    # --- GRÁFICO: Rosca Aninhada - Nível de Ensino > Curso (EGRESSOS) ---
+    st.subheader("Distribuição Hierárquica: Nível de Ensino e Cursos (Egressos)")
+
+    if 'nivel_ensino' in filtered_egressos.columns and 'nome_curso' in filtered_egressos.columns and not filtered_egressos.empty:
+        df_grouped_hierarchy_egressos = filtered_egressos.groupby(['nivel_ensino', 'nome_curso']).size().reset_index(name='count')
+        
+        # Para o Sunburst Chart (Hierarquia de Nível de Ensino -> Curso)
+        # Nível 1: Nível de Ensino
+        niveis_egressos = df_grouped_hierarchy_egressos.groupby('nivel_ensino')['count'].sum().reset_index()
+        niveis_egressos['ids'] = niveis_egressos['nivel_ensino']
+        niveis_egressos['parents'] = ""
+        niveis_egressos['labels'] = niveis_egressos['nivel_ensino']
+
+        # Nível 2: Curso dentro de Nível de Ensino
+        cursos_no_nivel_egressos = df_grouped_hierarchy_egressos.copy()
+        cursos_no_nivel_egressos['ids'] = cursos_no_nivel_egressos['nivel_ensino'] + " - " + cursos_no_nivel_egressos['nome_curso']
+        cursos_no_nivel_egressos['parents'] = cursos_no_nivel_egressos['nivel_ensino']
+        cursos_no_nivel_egressos['labels'] = cursos_no_nivel_egressos['nome_curso']
+
+        sunburst_data_nivel_egressos = pd.concat([
+            niveis_egressos[['ids', 'parents', 'labels', 'count']],
+            cursos_no_nivel_egressos[['ids', 'parents', 'labels', 'count']]
+        ])
+
+        fig_donut_aninhado_egressos = go.Figure(go.Sunburst(
+            ids=sunburst_data_nivel_egressos['ids'],
+            labels=sunburst_data_nivel_egressos['labels'],
+            parents=sunburst_data_nivel_egressos['parents'],
+            values=sunburst_data_nivel_egressos['count'],
+            branchvalues="total", 
+            hovertemplate='<b>%{label}</b><br>Alunos: %{value}<br>Percentual: %{percentParent}<extra></extra>'
+        ))
+        fig_donut_aninhado_egressos.update_layout(
+            margin = dict(t=0, l=0, r=0, b=0),
+            title_text='Egressos por Nível de Ensino e Cursos'
+        )
+
+        st.plotly_chart(fig_donut_aninhado_egressos, use_container_width=True)
+
+    else:
+        st.info("Colunas 'nivel_ensino' ou 'nome_curso' não disponíveis nos dados filtrados de egressos para o gráfico de rosca aninhado, ou DataFrame vazio.")
+
+
+    st.markdown("---") # Separador para os próximos gráficos
+
 
     if not filtered_egressos.empty:
         with st.container():
@@ -693,7 +1001,24 @@ with tab_egressos_viz:
                     st.info("Coluna 'sexo' não disponível nos dados de egressos para este gráfico.")
         
         st.subheader("Tabela de Dados Filtrados (Egressos)")
-        st.dataframe(filtered_egressos.head(10))
+
+        # Adiciona o slider para controlar a quantidade de alunos
+        max_rows_egressos = len(filtered_egressos)
+        num_alunos_egressos = st.slider(
+            "Número de alunos a exibir (Egressos):",
+            min_value=1,
+            max_value=max_rows_egressos if max_rows_egressos > 0 else 1,
+            value=min(10, max_rows_egressos) if max_rows_egressos > 0 else 1,
+            step=1,
+            key='num_alunos_egressos_slider'
+        )
+
+        # Cria uma cópia para remover a coluna sem afetar o DataFrame original
+        df_display_egressos = filtered_egressos.copy()
+        if 'nome_discente' in df_display_egressos.columns:
+            df_display_egressos = df_display_egressos.drop(columns=['nome_discente'])
+
+        st.dataframe(df_display_egressos.head(num_alunos_egressos))
         st.write(f"Total de registros de Egressos filtrados: {len(filtered_egressos)}")
 
         st.markdown("---") # Separador para o próximo gráfico
@@ -707,7 +1032,7 @@ with tab_egressos_viz:
             max_value=30, # Ajuste este max conforme a distribuição real dos seus dados
             value=20,
             step=1,
-            key='violin_periods_limit'
+            key='violin_periods_limit_egressos' # Chave única para este slider na aba de egressos
         )
 
         df_egressos_plot_for_violin = filtered_egressos.copy()
@@ -883,4 +1208,5 @@ st.sidebar.markdown("---")
 st.sidebar.info(
     "Este dashboard interativo permite explorar dados de ingressantes e egressos, "
     "analisando tendências e distribuições por ano, nível de ensino, sexo, curso e unidade."
+    "\nCriado por: Robson Carneiro"
 )
