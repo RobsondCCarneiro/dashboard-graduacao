@@ -10,6 +10,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
 
 # --- Configuração da página Streamlit ---
 st.set_page_config(layout="wide", page_title="Dashboard de Análise Acadêmica")
@@ -618,11 +620,12 @@ else:
 
 
 # --- Geração e Exibição dos Gráficos com Plotly.express em ABAS ---
-tab_ingressantes_viz, tab_egressos_viz, tab_comparacao_viz, tab_ml = st.tabs([
+tab_ingressantes_viz, tab_egressos_viz, tab_comparacao_viz, tab_ml_classificacao, tab_ml_regressao = st.tabs([
     "Análise de Ingressantes",
     "Análise de Egressos",
     "Comparativo Geral",
-    "Predição de Duração de Curso (ML)"
+    "Predição de Desempenho (Classificação)", # Nova aba para o modelo de classificação
+    "Predição de Duração de Curso (Regressão)" # Nova aba para o modelo de regressão
 ])
 
 # --- TAB 1: Análise de Ingressantes ---
@@ -1211,148 +1214,401 @@ with tab_comparacao_viz:
         st.info("Dados incompletos ou insuficientes para a aba de comparação. Verifique os filtros selecionados e se há dados para ambos os grupos.")
 
 # --- TAB 4: Machine Learning - Predição de Duração de Curso ---
-with tab_ml:
-    st.header("Predição do Tempo de Duração do Curso (Machine Learning)")
-    st.write("Esta seção utiliza um modelo de Machine Learning para prever se a duração do curso será 'Curta' ou 'Longa' para um aluno egresso, com base em características do curso e do aluno. **A unidade acadêmica não é utilizada nesta predição.**") # Texto atualizado
+# with tab_ml:
+#     st.header("Predição do Tempo de Duração do Curso (Machine Learning)")
+#     st.write("Esta seção utiliza um modelo de Machine Learning para prever se a duração do curso será 'Curta' ou 'Longa' para um aluno egresso, com base em características do curso e do aluno. **A unidade acadêmica não é utilizada nesta predição.**") # Texto atualizado
 
-    if filtered_egressos.empty or 'total_periodos' not in filtered_egressos.columns:
-        st.warning("Não há dados de egressos suficientes ou a coluna 'total_periodos' não está disponível para treinar o modelo de Machine Learning.")
-    else:
-        # 1. Preparação dos Dados para ML
-        ml_df = filtered_egressos.copy()
+#     if filtered_egressos.empty or 'total_periodos' not in filtered_egressos.columns:
+#         st.warning("Não há dados de egressos suficientes ou a coluna 'total_periodos' não está disponível para treinar o modelo de Machine Learning.")
+#     else:
+#         # 1. Preparação dos Dados para ML
+#         ml_df = filtered_egressos.copy()
 
-        # Remover linhas com valores zero ou nulos em 'total_periodos' que não façam sentido para a predição
-        ml_df = ml_df[ml_df['total_periodos'] > 0]
-        # Remover 'nome_unidade' daqui também
-        ml_df.dropna(subset=['nivel_ensino', 'sexo', 'nome_curso', 'total_periodos'], inplace=True) # ATUALIZADO
+#         # Remover linhas com valores zero ou nulos em 'total_periodos' que não façam sentido para a predição
+#         ml_df = ml_df[ml_df['total_periodos'] > 0]
+#         # Remover 'nome_unidade' daqui também
+#         ml_df.dropna(subset=['nivel_ensino', 'sexo', 'nome_curso', 'total_periodos'], inplace=True) # ATUALIZADO
 
-        if ml_df.empty:
-            st.warning("Após a limpeza, o DataFrame para Machine Learning está vazio. Certifique-se de que há dados de egressos válidos com 'total_periodos' > 0 e informações completas nas colunas de características.")
-        else:
-            # Definir a variável alvo (y) baseada na mediana de 'total_periodos'
-            median_periods = ml_df['total_periodos'].median()
-            st.info(f"A mediana de 'total_periodos' para este conjunto de dados é: **{median_periods:.2f}**.")
-            st.write(f"Consideramos 'Curto' se a duração for <= {int(median_periods)} períodos e 'Longo' se for > {int(median_periods)} períodos.")
+#         if ml_df.empty:
+#             st.warning("Após a limpeza, o DataFrame para Machine Learning está vazio. Certifique-se de que há dados de egressos válidos com 'total_periodos' > 0 e informações completas nas colunas de características.")
+#         else:
+#             # Definir a variável alvo (y) baseada na mediana de 'total_periodos'
+#             median_periods = ml_df['total_periodos'].median()
+#             st.info(f"A mediana de 'total_periodos' para este conjunto de dados é: **{median_periods:.2f}**.")
+#             st.write(f"Consideramos 'Curto' se a duração for <= {int(median_periods)} períodos e 'Longo' se for > {int(median_periods)} períodos.")
             
-            ml_df['duracao_curso'] = ml_df['total_periodos'].apply(lambda x: 'Curto' if x <= median_periods else 'Longo')
+#             ml_df['duracao_curso'] = ml_df['total_periodos'].apply(lambda x: 'Curto' if x <= median_periods else 'Longo')
 
-            # Features (X) e Target (y)
-            # 'nome_unidade' foi removido da lista de features
-            features = ['nivel_ensino', 'sexo', 'nome_curso'] # ATUALIZADO
-            target = 'duracao_curso'
+#             # Features (X) e Target (y)
+#             # 'nome_unidade' foi removido da lista de features
+#             features = ['nivel_ensino', 'sexo', 'nome_curso'] # ATUALIZADO
+#             target = 'duracao_curso'
 
-            X = ml_df[features]
-            y = ml_df[target]
+#             X = ml_df[features]
+#             y = ml_df[target]
 
-            # Codificação de variáveis categóricas (Label Encoding)
-            encoders = {}
-            X_encoded = X.copy()
-            for col in features:
-                le = LabelEncoder()
-                X_encoded[col] = le.fit_transform(X_encoded[col])
-                encoders[col] = le
+#             # Codificação de variáveis categóricas (Label Encoding)
+#             encoders = {}
+#             X_encoded = X.copy()
+#             for col in features:
+#                 le = LabelEncoder()
+#                 X_encoded[col] = le.fit_transform(X_encoded[col])
+#                 encoders[col] = le
 
-            # Divisão dos dados em treino e teste
-            X_train, X_test, y_train, y_test = train_test_split(X_encoded, y, test_size=0.3, random_state=42, stratify=y)
+#             # Divisão dos dados em treino e teste
+#             X_train, X_test, y_train, y_test = train_test_split(X_encoded, y, test_size=0.3, random_state=42, stratify=y)
 
-            # Treinamento do Modelo (Decision Tree Classifier)
-            model = DecisionTreeClassifier(random_state=42)
-            model.fit(X_train, y_train)
+#             # Treinamento do Modelo (Decision Tree Classifier)
+#             model = DecisionTreeClassifier(random_state=42)
+#             model.fit(X_train, y_train)
 
-            # Avaliação do Modelo
-            y_pred = model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            report = classification_report(y_test, y_pred, output_dict=True)
+#             # Avaliação do Modelo
+#             y_pred = model.predict(X_test)
+#             accuracy = accuracy_score(y_test, y_pred)
+#             report = classification_report(y_test, y_pred, output_dict=True)
 
-            st.subheader("Métricas de Desempenho do Modelo")
-            st.write(f"**Acurácia do Modelo:** {accuracy:.2f}")
-            st.write("---")
+#             st.subheader("Métricas de Desempenho do Modelo")
+#             st.write(f"**Acurácia do Modelo:** {accuracy:.2f}")
+#             st.write("---")
 
-            st.write("**Relatório de Classificação:**")
-            st.json(report)
-            st.write("---")
+#             st.write("**Relatório de Classificação:**")
+#             st.json(report)
+#             st.write("---")
 
-            st.subheader("Matriz de Confusão")
-            cm = confusion_matrix(y_test, y_pred, labels=['Curto', 'Longo'])
-            fig_cm = go.Figure(data=go.Heatmap(
-                z=cm,
-                x=['Previsto Curto', 'Previsto Longo'],
-                y=['Real Curto', 'Real Longo'],
-                colorscale='Viridis',
-                colorbar=dict(title='Contagem')
-            ))
-            fig_cm.update_layout(title='Matriz de Confusão',
-                                 xaxis_title='Classe Predita',
-                                 yaxis_title='Classe Verdadeira')
-            st.plotly_chart(fig_cm, use_container_width=True)
-            st.write("---")
+#             st.subheader("Matriz de Confusão")
+#             cm = confusion_matrix(y_test, y_pred, labels=['Curto', 'Longo'])
+#             fig_cm = go.Figure(data=go.Heatmap(
+#                 z=cm,
+#                 x=['Previsto Curto', 'Previsto Longo'],
+#                 y=['Real Curto', 'Real Longo'],
+#                 colorscale='Viridis',
+#                 colorbar=dict(title='Contagem')
+#             ))
+#             fig_cm.update_layout(title='Matriz de Confusão',
+#                                  xaxis_title='Classe Predita',
+#                                  yaxis_title='Classe Verdadeira')
+#             st.plotly_chart(fig_cm, use_container_width=True)
+#             st.write("---")
 
-            # 2. Interface de Predição para o Usuário
-            st.subheader("Faça uma Predição para um Novo Aluno Egresso")
+#             # 2. Interface de Predição para o Usuário
+#             st.subheader("Faça uma Predição para um Novo Aluno Egresso")
 
-            # Obter opções únicas para os seletores de ML com base nos dados originais (ml_df)
-            ml_nivel_ensino_options = sorted(ml_df['nivel_ensino'].unique())
-            ml_sexo_options = sorted(ml_df['sexo'].unique())
-            ml_nome_curso_options = sorted(ml_df['nome_curso'].unique())
-            # ml_nome_unidade_options removido aqui
+#             # Obter opções únicas para os seletores de ML com base nos dados originais (ml_df)
+#             ml_nivel_ensino_options = sorted(ml_df['nivel_ensino'].unique())
+#             ml_sexo_options = sorted(ml_df['sexo'].unique())
+#             ml_nome_curso_options = sorted(ml_df['nome_curso'].unique())
+#             # ml_nome_unidade_options removido aqui
 
-            input_nivel_ensino = st.selectbox(
-                "Nível de Ensino:", 
-                options=ml_nivel_ensino_options,
-                index=0 if ml_nivel_ensino_options else None
-            )
-            input_sexo = st.selectbox(
-                "Sexo:", 
-                options=ml_sexo_options,
-                index=0 if ml_sexo_options else None
-            )
-            input_nome_curso = st.selectbox(
-                "Nome do Curso:", 
-                options=ml_nome_curso_options,
-                index=0 if ml_nome_curso_options else None
-            )
-            # Removido o seletor de unidade acadêmica
-            # input_nome_unidade = st.selectbox(
-            #     "Nome da Unidade:", 
-            #     options=ml_nome_unidade_options,
-            #     index=0 if ml_nome_unidade_options else None
-            # )
+#             input_nivel_ensino = st.selectbox(
+#                 "Nível de Ensino:", 
+#                 options=ml_nivel_ensino_options,
+#                 index=0 if ml_nivel_ensino_options else None
+#             )
+#             input_sexo = st.selectbox(
+#                 "Sexo:", 
+#                 options=ml_sexo_options,
+#                 index=0 if ml_sexo_options else None
+#             )
+#             input_nome_curso = st.selectbox(
+#                 "Nome do Curso:", 
+#                 options=ml_nome_curso_options,
+#                 index=0 if ml_nome_curso_options else None
+#             )
+#             # Removido o seletor de unidade acadêmica
+#             # input_nome_unidade = st.selectbox(
+#             #     "Nome da Unidade:", 
+#             #     options=ml_nome_unidade_options,
+#             #     index=0 if ml_nome_unidade_options else None
+#             # )
 
-            predict_button = st.button("Prever Duração do Curso")
+#             predict_button = st.button("Prever Duração do Curso")
 
-            if predict_button:
-                # Ajustada a verificação para as features restantes
-                if None in [input_nivel_ensino, input_sexo, input_nome_curso]: # ATUALIZADO
-                    st.error("Por favor, selecione todas as opções para fazer a predição.")
-                else:
+#             if predict_button:
+#                 # Ajustada a verificação para as features restantes
+#                 if None in [input_nivel_ensino, input_sexo, input_nome_curso]: # ATUALIZADO
+#                     st.error("Por favor, selecione todas as opções para fazer a predição.")
+#                 else:
+#                     try:
+#                         # Codificar as entradas do usuário
+#                         encoded_nivel_ensino = encoders['nivel_ensino'].transform([input_nivel_ensino])[0]
+#                         encoded_sexo = encoders['sexo'].transform([input_sexo])[0]
+#                         encoded_nome_curso = encoders['nome_curso'].transform([input_nome_curso])[0]
+#                         # encoded_nome_unidade removido
+
+#                         # Criar DataFrame para a predição
+#                         # Removido 'encoded_nome_unidade' dos dados de entrada
+#                         input_data = pd.DataFrame([[encoded_nivel_ensino, encoded_sexo, encoded_nome_curso]], # ATUALIZADO
+#                                                     columns=X_encoded.columns)
+
+#                         # Fazer a predição
+#                         prediction = model.predict(input_data)[0]
+#                         prediction_proba = model.predict_proba(input_data)[0]
+
+#                         st.success(f"A predição para este aluno é: **{prediction}**")
+#                         # Garantir que a ordem das classes seja consistente
+#                         proba_curto = prediction_proba[np.where(model.classes_ == 'Curto')[0][0]] if 'Curto' in model.classes_ else 0
+#                         proba_longo = prediction_proba[np.where(model.classes_ == 'Longo')[0][0]] if 'Longo' in model.classes_ else 0
+
+#                         st.info(f"Probabilidade de ser 'Curto': **{proba_curto:.2f}**")
+#                         st.info(f"Probabilidade de ser 'Longo': **{proba_longo:.2f}**")
+
+#                     except ValueError as ve:
+#                         st.error(f"Erro ao codificar a entrada. Uma das opções selecionadas pode não ter sido vista durante o treinamento do modelo. Por favor, tente novamente. Detalhes: {ve}")
+#                     except Exception as e:
+#                         st.error(f"Ocorreu um erro ao fazer a predição: {e}")
+
+# --- NOVA TAB PARA O MODELO DE CLASSIFICAÇÃO ---
+with tab_ml_classificacao:
+    st.header("🎯 Predição de Desempenho (Classificação)")
+    st.write("Preveja se um aluno terá um tempo de graduação 'Curto' ou 'Longo' baseado em suas características. Este modelo usa a coluna `total_periodos` para classificar os egressos.")
+
+    # --- Verificação de dados para o modelo de classificação ---
+    if filtered_egressos.empty or 'total_periodos' not in filtered_egressos.columns:
+        st.warning("Não há dados de egressos com 'total_periodos' para treinar o modelo de classificação com os filtros atuais. Ajuste os filtros ou verifique seus dados de egressos.")
+        st.stop()
+
+    # Definição do limiar para "Curto" vs "Longo"
+    st.subheader("Definição do Limiar e Preparação dos Dados")
+    st.info("O tempo médio de graduação dos dados filtrados é de aproximadamente "
+            f"**{filtered_egressos['total_periodos'].mean():.1f} períodos**.")
+
+    # Limiar dinâmico ou fixo
+    median_periods = filtered_egressos['total_periodos'].median() if not filtered_egressos['total_periodos'].empty else 8 # Valor padrão razoável
+    threshold = st.slider(
+        "Defina o limiar para 'Curto' (em períodos, menor ou igual a este valor)",
+        min_value=1, max_value=24, value=int(median_periods), step=1
+    )
+    st.write(f"Alunos com tempo de graduação <= {threshold} períodos serão classificados como 'Curto'.")
+
+    # Criação da variável alvo
+    df_model = filtered_egressos.copy()
+    df_model['desempenho'] = df_model['total_periodos'].apply(lambda x: 'Curto' if x <= threshold else 'Longo')
+
+    # Contagem das classes
+    class_counts = df_model['desempenho'].value_counts()
+    st.info(f"Distribuição das classes: Curto = {class_counts.get('Curto', 0)}, Longo = {class_counts.get('Longo', 0)}")
+
+    # Seleção de Features para o modelo de Classificação
+    # Ajuste essas features com base na relevância do seu dataset
+    features_classificacao = ['nivel_ensino', 'sexo', 'nome_curso', 'nome_unidade']
+    target_classificacao = 'desempenho'
+
+    # Verifica se as colunas selecionadas existem no DataFrame
+    missing_features = [f for f in features_classificacao if f not in df_model.columns]
+    if missing_features:
+        st.error(f"As seguintes features estão faltando no DataFrame de egressos: {', '.join(missing_features)}. Ajuste a seleção de features ou verifique seus dados.")
+        st.stop()
+
+    X = df_model[features_classificacao]
+    y = df_model[target_classificacao]
+
+    # Codificação de variáveis categóricas
+    # Usaremos LabelEncoder para cada coluna individualmente e armazenaremos os encoders
+    encoders = {}
+    X_encoded_df = pd.DataFrame()
+    for col in X.columns:
+        if X[col].dtype == 'object':
+            le = LabelEncoder()
+            X_encoded_df[col] = le.fit_transform(X[col])
+            encoders[col] = le
+        else:
+            X_encoded_df[col] = X[col]
+
+    # Divisão em conjuntos de treino e teste
+    X_train, X_test, y_train, y_test = train_test_split(X_encoded_df, y, test_size=0.2, random_state=42, stratify=y)
+
+    # Treinamento do Modelo de Classificação
+    @st.cache_resource
+    def train_classification_model(X_train, y_train):
+        model = DecisionTreeClassifier(random_state=42)
+        model.fit(X_train, y_train)
+        return model
+
+    model = train_classification_model(X_train, y_train)
+
+    # Avaliação do Modelo
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+
+    st.success(f"Modelo de Classificação treinado com sucesso! 🎉")
+    st.info(f"Acurácia no conjunto de teste: **{accuracy:.2f}**")
+    st.text("Relatório de Classificação:")
+    st.code(classification_report(y_test, y_pred))
+    st.text("Matriz de Confusão:")
+    st.dataframe(pd.DataFrame(confusion_matrix(y_test, y_pred), index=model.classes_, columns=model.classes_))
+
+    st.markdown("---")
+    st.subheader("Simulação de Predição de Desempenho")
+    st.write("Insira as características de um aluno para prever se ele terá um tempo de graduação 'Curto' ou 'Longo'.")
+
+    # Coletar inputs do usuário para as features de classificação
+    input_values_class = {}
+    for feature in features_classificacao:
+        if feature in encoders: # Variáveis categóricas
+            unique_options = sorted(encoders[feature].classes_.tolist())
+            input_values_class[feature] = st.selectbox(f"Selecione o(a) {feature.replace('_', ' ').title()}", options=unique_options, key=f"class_{feature}")
+        else: # Variáveis numéricas (se houver)
+            st.write(f"Feature numérica '{feature}' não é suportada diretamente neste formulário de classificação. Considerar tratamento.")
+
+    if st.button("Prever Desempenho"):
+        try:
+            # Criar DataFrame com os inputs do usuário para classificação
+            input_data_class = pd.DataFrame([input_values_class])
+
+            # Codificar a entrada do usuário usando os encoders treinados
+            input_encoded_dict = {}
+            for col in X.columns:
+                if col in encoders:
+                    # Usar .transform para garantir que novas categorias causem erro e não NaN
+                    # Adicionado erro handling para categorias desconhecidas
                     try:
-                        # Codificar as entradas do usuário
-                        encoded_nivel_ensino = encoders['nivel_ensino'].transform([input_nivel_ensino])[0]
-                        encoded_sexo = encoders['sexo'].transform([input_sexo])[0]
-                        encoded_nome_curso = encoders['nome_curso'].transform([input_nome_curso])[0]
-                        # encoded_nome_unidade removido
-
-                        # Criar DataFrame para a predição
-                        # Removido 'encoded_nome_unidade' dos dados de entrada
-                        input_data = pd.DataFrame([[encoded_nivel_ensino, encoded_sexo, encoded_nome_curso]], # ATUALIZADO
-                                                    columns=X_encoded.columns)
-
-                        # Fazer a predição
-                        prediction = model.predict(input_data)[0]
-                        prediction_proba = model.predict_proba(input_data)[0]
-
-                        st.success(f"A predição para este aluno é: **{prediction}**")
-                        # Garantir que a ordem das classes seja consistente
-                        proba_curto = prediction_proba[np.where(model.classes_ == 'Curto')[0][0]] if 'Curto' in model.classes_ else 0
-                        proba_longo = prediction_proba[np.where(model.classes_ == 'Longo')[0][0]] if 'Longo' in model.classes_ else 0
-
-                        st.info(f"Probabilidade de ser 'Curto': **{proba_curto:.2f}**")
-                        st.info(f"Probabilidade de ser 'Longo': **{proba_longo:.2f}**")
-
+                        input_encoded_dict[col] = encoders[col].transform(input_data_class[col])
                     except ValueError as ve:
-                        st.error(f"Erro ao codificar a entrada. Uma das opções selecionadas pode não ter sido vista durante o treinamento do modelo. Por favor, tente novamente. Detalhes: {ve}")
-                    except Exception as e:
-                        st.error(f"Ocorreu um erro ao fazer a predição: {e}")
+                        st.error(f"Erro ao codificar a feature '{col}': A opção '{input_data_class[col].iloc[0]}' não foi vista durante o treinamento do modelo. Por favor, selecione uma opção válida.")
+                        st.stop()
+                else:
+                    input_encoded_dict[col] = input_data_class[col] # Para colunas numéricas, se houver
+
+            input_data_encoded = pd.DataFrame(input_encoded_dict, index=[0])
+
+            # Garantir que as colunas e a ordem sejam as mesmas usadas no treinamento
+            input_data_aligned = input_data_encoded.reindex(columns=X_train.columns, fill_value=0)
+
+            # Fazer a predição
+            prediction = model.predict(input_data_aligned)[0]
+            prediction_proba = model.predict_proba(input_data_aligned)[0]
+
+            st.success(f"A predição para este aluno é: **{prediction}**")
+            # Garantir que a ordem das classes seja consistente
+            proba_curto = prediction_proba[np.where(model.classes_ == 'Curto')[0][0]] if 'Curto' in model.classes_ else 0
+            proba_longo = prediction_proba[np.where(model.classes_ == 'Longo')[0][0]] if 'Longo' in model.classes_ else 0
+
+            st.info(f"Probabilidade de ser 'Curto': **{proba_curto:.2f}**")
+            st.info(f"Probabilidade de ser 'Longo': **{proba_longo:.2f}**")
+
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao fazer a predição: {e}")
+            st.write("Detalhes do erro:", e)
+
+
+# --- NOVA TAB PARA O MODELO DE REGRESSÃO ---
+with tab_ml_regressao:
+    st.header("⏳ Predição do Tempo de Graduação (Regressão)")
+    st.write("Utilize este modelo para estimar o número de períodos necessários para a graduação de um aluno, com base em suas características.")
+
+    # --- Verificação de dados para o modelo de regressão ---
+    # O modelo de regressão precisa de 'total_periodos' que está em egressos
+    if filtered_egressos.empty or 'total_periodos' not in filtered_egressos.columns or filtered_egressos['total_periodos'].isnull().all():
+        st.warning("Não há dados de egressos com 'total_periodos' válidos para treinar o modelo de regressão com os filtros atuais. Ajuste os filtros ou verifique seus dados de egressos.")
+        st.stop()
+
+    # --- Preparação dos dados para o Modelo de Regressão ---
+    st.subheader("Configuração e Treinamento do Modelo")
+
+    # Features para o modelo de regressão (ajuste conforme a relevância do seu dataset)
+    features_regressao = ['nivel_ensino', 'sexo', 'nome_curso', 'nome_unidade', 'ano_ingresso']
+    target_regressao = 'total_periodos'
+
+    # Filtrar o DataFrame de egressos para incluir apenas as colunas relevantes e remover NaNs no target
+    df_regressao = filtered_egressos[features_regressao + [target_regressao]].dropna(subset=[target_regressao]).copy()
+
+    if df_regressao.empty:
+        st.warning("Após a seleção de features e remoção de valores ausentes, o DataFrame de regressão está vazio. O modelo não pode ser treinado.")
+        st.stop()
+
+    # Certificar-se de que 'ano_ingresso' é numérica
+    if 'ano_ingresso' in df_regressao.columns:
+        df_regressao['ano_ingresso'] = pd.to_numeric(df_regressao['ano_ingresso'], errors='coerce').fillna(df_regressao['ano_ingresso'].mean())
+
+    # Separação de features (X) e target (y)
+    X_reg = df_regressao[features_regressao]
+    y_reg = df_regressao[target_regressao]
+
+    # Codificação de variáveis categóricas para o modelo de regressão
+    # Usar pd.get_dummies é mais robusto para novas categorias em inferência
+    X_reg_encoded = pd.get_dummies(X_reg, columns=[col for col in features_regressao if X_reg[col].dtype == 'object'])
+
+    # Divisão em conjuntos de treino e teste
+    X_train_reg, X_test_reg, y_train_reg, y_test_reg = train_test_split(X_reg_encoded, y_reg, test_size=0.2, random_state=42)
+
+    # Treinamento do Modelo de Regressão (RandomForestRegressor como exemplo)
+    @st.cache_resource
+    def train_regression_model(X_train, y_train):
+        model_reg = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1) # n_jobs=-1 para usar todos os cores
+        model_reg.fit(X_train, y_train)
+        return model_reg
+
+    model_reg = train_regression_model(X_train_reg, y_train_reg)
+
+    # Avaliação do Modelo
+    y_pred_reg = model_reg.predict(X_test_reg)
+    mse = mean_squared_error(y_test_reg, y_pred_reg)
+    rmse = np.sqrt(mse) # Root Mean Squared Error
+    r2 = r2_score(y_test_reg, y_pred_reg)
+
+    st.success(f"Modelo de Regressão treinado com sucesso! 🎉")
+    st.info(f"Métricas de Avaliação no conjunto de teste:")
+    st.markdown(f"- Erro Quadrático Médio (MSE): **{mse:.2f}**")
+    st.markdown(f"- Raiz do Erro Quadrático Médio (RMSE): **{rmse:.2f}**")
+    st.markdown(f"- Coeficiente de Determinação (R² Score): **{r2:.2f}**")
+    st.markdown("Um R² mais próximo de 1 indica um modelo que explica melhor a variância dos dados.")
+
+    st.markdown("---")
+    st.subheader("Simulação de Predição de Períodos")
+    st.write("Insira as características de um aluno para prever o número de períodos até a graduação.")
+
+    # Coletar inputs do usuário para as features de regressão
+    input_reg_values = {}
+    for feature in features_regressao:
+        if feature == 'ano_ingresso':
+            # Obter o intervalo de anos válidos dos dados para o slider/number_input
+            min_year_input = int(X_reg['ano_ingresso'].min()) if not X_reg['ano_ingresso'].empty else 2014
+            max_year_input = int(X_reg['ano_ingresso'].max()) if not X_reg['ano_ingresso'].empty else 2024
+            input_reg_values[feature] = st.number_input(
+                f"Ano de Ingresso",
+                min_value=min_year_input,
+                max_value=max_year_input,
+                value=int(X_reg['ano_ingresso'].mode()[0]) if not X_reg['ano_ingresso'].empty else 2020,
+                step=1,
+                key=f"reg_input_{feature}" # Chave única para o widget
+            )
+        elif X_reg[feature].dtype == 'object':
+            unique_options = sorted(filtered_egressos[feature].unique().tolist())
+            input_reg_values[feature] = st.selectbox(f"Selecione o(a) {feature.replace('_', ' ').title()}", options=unique_options, key=f"reg_input_{feature}")
+        else: # Para outras features numéricas, se houver
+            input_reg_values[feature] = st.number_input(f"Valor para '{feature.replace('_', ' ').title()}'", value=float(X_reg[feature].mean()), key=f"reg_input_{feature}")
+
+    if st.button("Prever Duração da Graduação", key="predict_reg_button"): # Chave única para o botão
+        try:
+            # Criar DataFrame com os inputs do usuário
+            input_data_reg = pd.DataFrame([input_reg_values])
+
+            # Codificar variáveis categóricas do input, garantindo que as colunas sejam as mesmas do treino
+            input_data_reg_encoded = pd.get_dummies(input_data_reg, columns=[col for col in features_regressao if input_data_reg[col].dtype == 'object'])
+
+            # Alinhar colunas do input com as colunas usadas no treinamento do modelo (importante para get_dummies)
+            # Adicionar colunas ausentes e preencher com 0
+            missing_cols_input = set(X_train_reg.columns) - set(input_data_reg_encoded.columns)
+            for c in missing_cols_input:
+                input_data_reg_encoded[c] = 0
+
+            # Remover colunas extras do input que não foram vistas no treino
+            extra_cols_input = set(input_data_reg_encoded.columns) - set(X_train_reg.columns)
+            input_data_reg_encoded = input_data_reg_encoded.drop(columns=list(extra_cols_input), errors='ignore')
+
+            # Reordenar colunas para que correspondam à ordem de treino
+            input_data_reg_encoded = input_data_reg_encoded[X_train_reg.columns]
+
+            # Fazer a predição
+            predicted_periods = model_reg.predict(input_data_reg_encoded)[0]
+
+            st.success(f"A duração estimada da graduação é de aproximadamente **{predicted_periods:.1f} períodos**.")
+            st.info(f"Isso equivale a cerca de **{predicted_periods / 2:.1f} anos**.")
+
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao fazer a predição: {e}. Verifique se todos os campos foram preenchidos corretamente.")
+            st.write("Detalhes do erro:", e)
+
 
 st.sidebar.markdown("---")
 st.sidebar.info(
