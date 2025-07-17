@@ -5,6 +5,11 @@ import plotly.graph_objects as go
 import re
 import os
 import base64
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import numpy as np
 
 # --- Configuração da página Streamlit ---
 st.set_page_config(layout="wide", page_title="Dashboard de Análise Acadêmica")
@@ -125,7 +130,7 @@ st.markdown(css_string, unsafe_allow_html=True)
 
 
 st.title("🎓 Dashboard de Análise Acadêmica 🎓")
-st.markdown("Explore dados de ingressantes e egressos, filtrando por ano, nível de ensino, sexo, curso e unidade.")
+st.markdown("Explore dados de ingressantes e egressos, filtrando por ano, nível de ensino, sexo, curso e unidade. **Novo!** Preveja o tempo de graduação com Machine Learning.")
 
 
 # --- Caminhos para as pastas dos CSVs ---
@@ -613,10 +618,11 @@ else:
 
 
 # --- Geração e Exibição dos Gráficos com Plotly.express em ABAS ---
-tab_ingressantes_viz, tab_egressos_viz, tab_comparacao_viz = st.tabs([
+tab_ingressantes_viz, tab_egressos_viz, tab_comparacao_viz, tab_ml = st.tabs([
     "Análise de Ingressantes",
     "Análise de Egressos",
-    "Comparativo Geral"
+    "Comparativo Geral",
+    "Predição de Duração de Curso (ML)"
 ])
 
 # --- TAB 1: Análise de Ingressantes ---
@@ -1203,6 +1209,150 @@ with tab_comparacao_viz:
 
     else:
         st.info("Dados incompletos ou insuficientes para a aba de comparação. Verifique os filtros selecionados e se há dados para ambos os grupos.")
+
+# --- TAB 4: Machine Learning - Predição de Duração de Curso ---
+with tab_ml:
+    st.header("Predição do Tempo de Duração do Curso (Machine Learning)")
+    st.write("Esta seção utiliza um modelo de Machine Learning para prever se a duração do curso será 'Curta' ou 'Longa' para um aluno egresso, com base em características do curso e do aluno. **A unidade acadêmica não é utilizada nesta predição.**") # Texto atualizado
+
+    if filtered_egressos.empty or 'total_periodos' not in filtered_egressos.columns:
+        st.warning("Não há dados de egressos suficientes ou a coluna 'total_periodos' não está disponível para treinar o modelo de Machine Learning.")
+    else:
+        # 1. Preparação dos Dados para ML
+        ml_df = filtered_egressos.copy()
+
+        # Remover linhas com valores zero ou nulos em 'total_periodos' que não façam sentido para a predição
+        ml_df = ml_df[ml_df['total_periodos'] > 0]
+        # Remover 'nome_unidade' daqui também
+        ml_df.dropna(subset=['nivel_ensino', 'sexo', 'nome_curso', 'total_periodos'], inplace=True) # ATUALIZADO
+
+        if ml_df.empty:
+            st.warning("Após a limpeza, o DataFrame para Machine Learning está vazio. Certifique-se de que há dados de egressos válidos com 'total_periodos' > 0 e informações completas nas colunas de características.")
+        else:
+            # Definir a variável alvo (y) baseada na mediana de 'total_periodos'
+            median_periods = ml_df['total_periodos'].median()
+            st.info(f"A mediana de 'total_periodos' para este conjunto de dados é: **{median_periods:.2f}**.")
+            st.write(f"Consideramos 'Curto' se a duração for <= {int(median_periods)} períodos e 'Longo' se for > {int(median_periods)} períodos.")
+            
+            ml_df['duracao_curso'] = ml_df['total_periodos'].apply(lambda x: 'Curto' if x <= median_periods else 'Longo')
+
+            # Features (X) e Target (y)
+            # 'nome_unidade' foi removido da lista de features
+            features = ['nivel_ensino', 'sexo', 'nome_curso'] # ATUALIZADO
+            target = 'duracao_curso'
+
+            X = ml_df[features]
+            y = ml_df[target]
+
+            # Codificação de variáveis categóricas (Label Encoding)
+            encoders = {}
+            X_encoded = X.copy()
+            for col in features:
+                le = LabelEncoder()
+                X_encoded[col] = le.fit_transform(X_encoded[col])
+                encoders[col] = le
+
+            # Divisão dos dados em treino e teste
+            X_train, X_test, y_train, y_test = train_test_split(X_encoded, y, test_size=0.3, random_state=42, stratify=y)
+
+            # Treinamento do Modelo (Decision Tree Classifier)
+            model = DecisionTreeClassifier(random_state=42)
+            model.fit(X_train, y_train)
+
+            # Avaliação do Modelo
+            y_pred = model.predict(X_test)
+            accuracy = accuracy_score(y_test, y_pred)
+            report = classification_report(y_test, y_pred, output_dict=True)
+
+            st.subheader("Métricas de Desempenho do Modelo")
+            st.write(f"**Acurácia do Modelo:** {accuracy:.2f}")
+            st.write("---")
+
+            st.write("**Relatório de Classificação:**")
+            st.json(report)
+            st.write("---")
+
+            st.subheader("Matriz de Confusão")
+            cm = confusion_matrix(y_test, y_pred, labels=['Curto', 'Longo'])
+            fig_cm = go.Figure(data=go.Heatmap(
+                z=cm,
+                x=['Previsto Curto', 'Previsto Longo'],
+                y=['Real Curto', 'Real Longo'],
+                colorscale='Viridis',
+                colorbar=dict(title='Contagem')
+            ))
+            fig_cm.update_layout(title='Matriz de Confusão',
+                                 xaxis_title='Classe Predita',
+                                 yaxis_title='Classe Verdadeira')
+            st.plotly_chart(fig_cm, use_container_width=True)
+            st.write("---")
+
+            # 2. Interface de Predição para o Usuário
+            st.subheader("Faça uma Predição para um Novo Aluno Egresso")
+
+            # Obter opções únicas para os seletores de ML com base nos dados originais (ml_df)
+            ml_nivel_ensino_options = sorted(ml_df['nivel_ensino'].unique())
+            ml_sexo_options = sorted(ml_df['sexo'].unique())
+            ml_nome_curso_options = sorted(ml_df['nome_curso'].unique())
+            # ml_nome_unidade_options removido aqui
+
+            input_nivel_ensino = st.selectbox(
+                "Nível de Ensino:", 
+                options=ml_nivel_ensino_options,
+                index=0 if ml_nivel_ensino_options else None
+            )
+            input_sexo = st.selectbox(
+                "Sexo:", 
+                options=ml_sexo_options,
+                index=0 if ml_sexo_options else None
+            )
+            input_nome_curso = st.selectbox(
+                "Nome do Curso:", 
+                options=ml_nome_curso_options,
+                index=0 if ml_nome_curso_options else None
+            )
+            # Removido o seletor de unidade acadêmica
+            # input_nome_unidade = st.selectbox(
+            #     "Nome da Unidade:", 
+            #     options=ml_nome_unidade_options,
+            #     index=0 if ml_nome_unidade_options else None
+            # )
+
+            predict_button = st.button("Prever Duração do Curso")
+
+            if predict_button:
+                # Ajustada a verificação para as features restantes
+                if None in [input_nivel_ensino, input_sexo, input_nome_curso]: # ATUALIZADO
+                    st.error("Por favor, selecione todas as opções para fazer a predição.")
+                else:
+                    try:
+                        # Codificar as entradas do usuário
+                        encoded_nivel_ensino = encoders['nivel_ensino'].transform([input_nivel_ensino])[0]
+                        encoded_sexo = encoders['sexo'].transform([input_sexo])[0]
+                        encoded_nome_curso = encoders['nome_curso'].transform([input_nome_curso])[0]
+                        # encoded_nome_unidade removido
+
+                        # Criar DataFrame para a predição
+                        # Removido 'encoded_nome_unidade' dos dados de entrada
+                        input_data = pd.DataFrame([[encoded_nivel_ensino, encoded_sexo, encoded_nome_curso]], # ATUALIZADO
+                                                    columns=X_encoded.columns)
+
+                        # Fazer a predição
+                        prediction = model.predict(input_data)[0]
+                        prediction_proba = model.predict_proba(input_data)[0]
+
+                        st.success(f"A predição para este aluno é: **{prediction}**")
+                        # Garantir que a ordem das classes seja consistente
+                        proba_curto = prediction_proba[np.where(model.classes_ == 'Curto')[0][0]] if 'Curto' in model.classes_ else 0
+                        proba_longo = prediction_proba[np.where(model.classes_ == 'Longo')[0][0]] if 'Longo' in model.classes_ else 0
+
+                        st.info(f"Probabilidade de ser 'Curto': **{proba_curto:.2f}**")
+                        st.info(f"Probabilidade de ser 'Longo': **{proba_longo:.2f}**")
+
+                    except ValueError as ve:
+                        st.error(f"Erro ao codificar a entrada. Uma das opções selecionadas pode não ter sido vista durante o treinamento do modelo. Por favor, tente novamente. Detalhes: {ve}")
+                    except Exception as e:
+                        st.error(f"Ocorreu um erro ao fazer a predição: {e}")
 
 st.sidebar.markdown("---")
 st.sidebar.info(
